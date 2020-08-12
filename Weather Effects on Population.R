@@ -36,7 +36,10 @@ affect_pop <- full_join(Fat_Strm, Inj_Strm, by = c("EVTYPE", "Num", "Type")) %>%
 
 # create graph for the data
 hlth_grph <- ggplot(data = affect_pop, aes(x = EVTYPE, y = Num, fill = Type)) + 
-  geom_bar(stat = "identity")
+  coord_flip()+
+  geom_bar(stat = "identity", color = "black") +
+  labs(title = "Injuries By Event", x = "Event", y = "Number of Injuries")+
+  theme(plot.title = element_text(hjust = 0.5))
 
 # Find the events with the largest economic impact
 
@@ -76,7 +79,7 @@ crop_dmg <- crop_dmg %>%
 # aggregate sum of damage by event type
 prop_dmg <- aggregate(amount ~ EVTYPE, prop_dmg, FUN = sum)
 prop_dmg <- prop_dmg %>% #have type of damage column
-  mutate(Type = "Prop")
+  mutate(Type = "Property")
 
 crop_dmg <- aggregate(amount ~ EVTYPE, crop_dmg, FUN = sum)
 crop_dmg <- crop_dmg %>% #have type of damage column
@@ -104,4 +107,9 @@ top_bad <- aggregate(amount ~ EVTYPE, tot_dam, sum) %>%
 tot_dam <- filter(tot_dam, tot_dam$EVTYPE %in% top_bad$EVTYPE)
 
 dmg_grph <- ggplot(data = tot_dam, aes(x = factor(EVTYPE), y = amount, fill = Type)) + 
-  geom_bar(stat = "identity")
+  geom_bar(stat = "identity", color = "black") +
+  scale_fill_manual(values = c("skyblue1", "wheat1")) +
+  coord_flip()+
+  geom_bar(stat = "identity") +
+  labs(title = "Damage By Event", x = "Event", y = "Millions of Dollars")+
+  theme(plot.title = element_text(hjust = 0.5))
