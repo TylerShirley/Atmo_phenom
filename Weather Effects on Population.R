@@ -111,5 +111,5 @@ dmg_grph <- ggplot(data = tot_dam, aes(x = factor(EVTYPE), y = amount, fill = Ty
   scale_fill_manual(values = c("skyblue1", "wheat1")) +
   coord_flip()+
   geom_bar(stat = "identity") +
-  labs(title = "Damage By Event", x = "Event", y = "Millions of Dollars")+
+  labs(title = "Dollar Damage By Event", x = "Event", y = "Millions of Dollars")+
   theme(plot.title = element_text(hjust = 0.5))
