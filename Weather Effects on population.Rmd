@@ -1,0 +1,154 @@
+---
+title: "Weather Effects on Population"
+author: "Tyler Shirley"
+date: "8/10/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Meterological Events With Largest Effects On United States
+
+Data was loaded into R by reading it from the zip file provided. Then all packages were loaded to assist with data cleaning.
+```{r}
+# Read the Atmospheric data csv file
+raw_storm_data <- read.csv("repdata_data_StormData.csv")
+
+# Import R packages
+  library(dplyr)
+  library(ggplot2)
+```
+## Data Transformation for Greatest Health Consequences
+
+Only the fatality and injury data were applicable when answering the events with the largest health consequences. So a new dataframe was created form the original data. The data was cleaned by aggregatign the injuries or fatalities by type then assigning them to a "type" so they can be differenciated when the two dataframes are combined. The top 10 most impactful events were taken after the dataframes were combined. This made the graph more legible.
+
+```{r}
+pop_hlth <- raw_storm_data %>% #Create new dataframe of only health concern data
+  select(EVTYPE,
+         FATALITIES,
+         INJURIES)
+
+#Aggregate by type
+Fat_Strm <- aggregate(FATALITIES ~ EVTYPE, pop_hlth, FUN = sum) 
+Inj_Strm <- aggregate(INJURIES ~ EVTYPE, pop_hlth, FUN = sum)
+
+# Create 2 new vectors and 
+Fat_Strm <- Fat_Strm %>%
+  rename(Num = FATALITIES) %>%
+  arrange(desc(Num)) %>%
+  top_n(10) %>%
+  mutate(Type = "Fatality") 
+
+Inj_Strm <- Inj_Strm %>%
+  rename(Num = INJURIES) %>%
+  arrange(desc(Num)) %>%
+  top_n(10) %>%
+  mutate(Type = "Injury")
+
+#Join each and take top 10 most severe with injury affecting more people
+affect_pop <- full_join(Fat_Strm, Inj_Strm, by = c("EVTYPE", "Num", "Type")) %>%
+  filter(Num > 0)
+```
+
+## Data Transformation for Greatest Economic Consequences
+
+Similar transformations were made to the economic consequences. Where crop and property damage were extracted from the uncleaned data. Then the magnitude of the economic impact had to be calculated by multiplying the expected property damage by the estimates factor. The two dataframes were combined with labels to indicate if the economic impact was Crop or Property Damage. Then only the top 10 most catastrophic events were logged to make the graph more legible. 
+
+```{r}
+# Find the events with the largest economic impact
+
+prop_dmg <- raw_storm_data %>%
+  select(EVTYPE,
+         PROPDMG,
+         PROPDMGEXP)
+
+#Mutate to multiply by damage factors
+prop_dmg <- prop_dmg %>%
+  mutate(PROPDMG = case_when(
+         PROPDMGEXP == "K" ~ PROPDMG * 1000,
+         PROPDMGEXP == "M" ~ PROPDMG * 10^6,
+         PROPDMGEXP == "B" ~ PROPDMG * 10^9,
+         )) %>%
+  select(-PROPDMGEXP) %>% #Take out multiplier column
+  rename(amount = PROPDMG) %>% #Rename to common amount
+  na.omit() # Remove any NA values
+
+#Create data matrix of crop damages
+crop_dmg <- raw_storm_data %>%
+  select(EVTYPE,
+         CROPDMG,
+         CROPDMGEXP)
+
+#Mutate to multiply crop damage by damage factor
+crop_dmg <- crop_dmg %>%
+  mutate(CROPDMG = case_when(
+    CROPDMGEXP == "K" ~ CROPDMG * 1000,
+    CROPDMGEXP == "M" ~ CROPDMG * 10^6,
+    CROPDMGEXP == "B" ~ CROPDMG * 10^9,
+  )) %>%
+  select(-CROPDMGEXP) %>% #Take out multiplier column
+  rename(amount = CROPDMG) %>%
+  na.omit()
+
+# aggregate sum of damage by event type
+prop_dmg <- aggregate(amount ~ EVTYPE, prop_dmg, FUN = sum)
+prop_dmg <- prop_dmg %>% #have type of damage column
+  mutate(Type = "Property")
+
+crop_dmg <- aggregate(amount ~ EVTYPE, crop_dmg, FUN = sum)
+crop_dmg <- crop_dmg %>% #have type of damage column
+  mutate(Type = "Crop")
+
+#find the top contributors to economic impact
+prop_dmg <- prop_dmg %>%
+  mutate(amount = amount / 10^6) %>% #Damage in millions
+  arrange(desc(amount))
+
+crop_dmg <- crop_dmg %>%
+  mutate(amount = amount / 10^6) %>% #Damage in millions
+  arrange(desc(amount))
+
+# Create full damage dataframe
+tot_dam <- full_join(prop_dmg, crop_dmg) %>%
+  filter(amount > 0)
+
+#get top 10 most catastrophic
+top_bad <- aggregate(amount ~ EVTYPE, tot_dam, sum) %>% 
+  arrange(desc(amount)) %>%
+  top_n(10)
+
+#Filter the top 10 most catastrophic
+tot_dam <- filter(tot_dam, tot_dam$EVTYPE %in% top_bad$EVTYPE)
+```
+
+## Results and Conclusion
+The Graphs below show the health and economic impact of various meterological events.
+
+```{r}
+# create graph for the data
+hlth_grph <- ggplot(data = affect_pop, aes(x = EVTYPE, y = Num, fill = Type)) + 
+  coord_flip()+
+  geom_bar(stat = "identity", color = "black") +
+  labs(title = "Health Impacts By Event", x = "Event", y = "Number of Incidents")+
+  theme(plot.title = element_text(hjust = 0.5))
+
+hlth_grph
+```
+The health data shows Tornados have the largest impact to health by a significant margin. It carries the more injuries and fatalities than the other top events combined.
+
+```{r}
+dmg_grph <- ggplot(data = tot_dam, aes(x = factor(EVTYPE), y = amount, fill = Type)) + 
+  geom_bar(stat = "identity", color = "black") +
+  scale_fill_manual(values = c("skyblue1", "wheat1")) +
+  coord_flip()+
+  geom_bar(stat = "identity") +
+  labs(title = "Dollar Damage By Event", x = "Event", y = "Millions of Dollars")+
+  theme(plot.title = element_text(hjust = 0.5))
+
+dmg_grph
+```
+
+Flood is the meterological event with the most economic impact because of the amount of property damage. However the crop damage done is not as impactful as drought. While Flood does create the most economic impact for overall damage, Drought does cause more crop damage.
+
